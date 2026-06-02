@@ -5,7 +5,9 @@ Every sound is **synthesized live** with the Web Audio API — no samples, no
 recordings. Underneath runs a slowly evolving system that wanders on its own;
 you nudge its tendencies rather than play notes, so it never quite holds still.
 
-## Run it
+Demo: https://florinandrei.github.io/aeon-generative-soundscape/
+
+## Run it locally
 
 No build step and no dependencies — just static files. Serve the directory and
 open it in a browser:
