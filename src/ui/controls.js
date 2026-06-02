@@ -48,7 +48,7 @@ export function createControls(root, { system, voices, recorder, graph, seedToke
   subLevel.min = '0';
   subLevel.max = '4';
   subLevel.step = '0.05';
-  subLevel.value = '2';
+  subLevel.value = String(graph.subBus.gain.value); // reflect the graph's default, don't duplicate it
   subLevel.addEventListener('input', () => graph.setSubLevel(parseFloat(subLevel.value)));
   subRow.append(subSpan, subLevel);
   outGroup.append(subRow);

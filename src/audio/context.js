@@ -34,7 +34,7 @@ export function createAudioGraph() {
   // The sub connects here instead of `dry`. The bus gain is the master "how loud
   // is the sub" knob; subLimiter is a gentle catch so big swells stay controlled.
   const subBus = ctx.createGain();
-  subBus.gain.value = 2.0; // ~+6 dB over the old in-mix level
+  subBus.gain.value = 3.0; // sub default; single source of truth (the slider reads this back)
 
   const subLimiter = ctx.createDynamicsCompressor();
   subLimiter.threshold.value = -3;
@@ -113,7 +113,7 @@ export function createAudioGraph() {
     setVolume(v) {
       userVol.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), ctx.currentTime, 0.08);
     },
-    // Sub bus level (how loud the low end sits), eased. Default 2.0 (~+6 dB).
+    // Sub bus level (how loud the low end sits), eased. Default set on subBus above.
     setSubLevel(v) {
       subBus.gain.setTargetAtTime(Math.max(0, v), ctx.currentTime, 0.1);
     },
