@@ -24,7 +24,13 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
 
   muteGain.connect(lp);
   lp.connect(out);
-  out.connect(graph.dry);
+  // Dedicated dry-path gain so the direct signal can be trimmed independently of
+  // the delay/reverb sends (which tap from `out` below at full level). At 1.0 now,
+  // but lower it here to push the motes back without drying out their tails.
+  const dryGain = ctx.createGain();
+  dryGain.gain.value = 1.0;
+  out.connect(dryGain);
+  dryGain.connect(graph.dry);
   // Motes lean on both delay (movement) and reverb (tail).
   const toDelay = ctx.createGain();
   toDelay.gain.value = 0.9;
