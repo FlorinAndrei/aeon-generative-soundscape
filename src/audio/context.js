@@ -7,7 +7,26 @@
 // analyser (for visuals) and the speakers. A recording tap sits at the very end.
 
 export function createAudioGraph() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // We trade latency for a big stability margin: this is an ambient instrument
+  // with no real-time interaction, and a larger output buffer is what lets the
+  // render thread ride through CPU spikes (and the burst when a phone screen
+  // switches on/off) without underrunning into crackle. latencyHint accepts a
+  // number of seconds, which the browser maps to a buffer size — so we probe the
+  // platform's own 'playback' latency and then ask for double that, for extra
+  // headroom on weak devices. (A fixed number could be smaller than a phone's
+  // native 'playback' buffer and make things worse, hence the probe.)
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  let latencyHint = 'playback';
+  try {
+    const probe = new Ctor({ latencyHint: 'playback' });
+    const base = probe.baseLatency || 0;
+    probe.close();
+    if (base > 0) latencyHint = base * 2;
+  } catch (e) {
+    // Older browser without numeric hints / per-context options: fall back to
+    // the 'playback' category, still larger than the default.
+  }
+  const ctx = new Ctor({ latencyHint });
 
   // Dry bus: where every musical voice's direct signal lands.
   const dry = ctx.createGain();
@@ -88,6 +107,13 @@ export function createAudioGraph() {
   analyser.connect(ctx.destination);
   userVol.connect(recordDest);
 
+  // Direct speaker path is `analyser -> ctx.destination` above. On mobile we
+  // instead play the mix through an <audio> element fed by `recordDest.stream`
+  // (see main.js), because Chrome suspends a bare AudioContext when the screen
+  // locks but keeps media-element playback alive. detachSpeakers() drops the
+  // direct path once the element is playing, so the sound isn't doubled.
+  let speakersAttached = true;
+
   return {
     ctx,
     dry,
@@ -120,6 +146,18 @@ export function createAudioGraph() {
     // Engage/disengage the evening low-pass.
     setEvening(on) {
       evening.frequency.setTargetAtTime(on ? 1500 : 20000, ctx.currentTime, 0.6);
+    },
+    // Drop the direct speaker path (used once the <audio> sink is playing, so
+    // output isn't doubled). Idempotent and reversible.
+    detachSpeakers() {
+      if (!speakersAttached) return;
+      try { analyser.disconnect(ctx.destination); } catch (e) { /* already gone */ }
+      speakersAttached = false;
+    },
+    attachSpeakers() {
+      if (speakersAttached) return;
+      analyser.connect(ctx.destination);
+      speakersAttached = true;
     },
   };
 }

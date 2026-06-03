@@ -43,7 +43,15 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
 
   let level = 0;
 
+  // Cap concurrent FM voices. Density blooms (regime changes) can ask for many
+  // overlapping droplets; unbounded, the stacked oscillators spike CPU on mobile
+  // and the whole mix crackles. We simply drop onsets past the cap — sparse, so
+  // it's inaudible in the texture.
+  const MAX_VOICES = 14;
+  let active = 0;
+
   function trigger(time) {
+    if (active >= MAX_VOICES) return;
     // Choose a note from the upper register of the current scale.
     const pool = scaleNotes(system.rootPc, system.scaleName, 60, 88);
     if (!pool.length) return;
@@ -88,6 +96,9 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
     mod.start(time);
     carrier.stop(time + decay + 0.1);
     mod.stop(time + decay + 0.1);
+
+    active++;
+    carrier.onended = () => { active--; };
 
     level = Math.min(1, level + 0.6);
     if (emit) emit('mote', { time, pan: pan.pan.value, midi, strength: peak * 6 });

@@ -17,7 +17,15 @@ python3 -m http.server 8137
 ```
 
 `AudioContext` requires a user gesture, so nothing starts until you click the
-"tap to begin" overlay. Press **H** to hide/show the control panel.
+"tap to begin" overlay. Press **H** (or tap the **☰** button — for phones, which
+have no keyboard) to hide/show the control panel.
+
+To test on a phone, serve on all interfaces and open `http://<your-LAN-IP>:8137/`
+from the phone (same Wi-Fi):
+
+```
+python3 -m http.server 8137 --bind 0.0.0.0
+```
 
 ## Verifying changes
 
@@ -42,10 +50,18 @@ graph, instantiates the system + voices + visuals, wires the UI, and runs two
 loops.
 
 **Two clocks** (Chris Wilson "Tale of Two Clocks" pattern):
-- `engine/scheduler.js` — a `setInterval` lookahead (~25 ms) that schedules
-  *triggered* audio events ~120 ms ahead on the precise `AudioContext` clock.
+- `engine/scheduler.js` — a lookahead scheduler that schedules *triggered* audio
+  events on the precise `AudioContext` clock. It's driven by **two redundant
+  clocks**: a `setInterval` (~25 ms) and an AudioWorklet metronome
+  (`engine/clock-worklet.js`). The worklet runs on the audio render thread, which
+  Chrome does *not* throttle when the page is hidden, so it keeps the scheduler
+  ticking with the phone screen off (where `setInterval` is throttled to ~1 Hz).
+  The lookahead is visibility-aware: ~0.2 s when visible, 1.5 s when hidden, so a
+  single throttled wakeup still buffers enough audio to bridge the gap.
 - a `requestAnimationFrame` loop in `main.js` — advances the system's inertia,
-  pushes live macros to the continuous voices/sends, and drives the canvas.
+  pushes live macros to the continuous voices/sends, and drives the canvas. rAF
+  stops entirely when the page is hidden, so autonomous evolution + visuals pause
+  with the screen off; the triggered voices keep going via the scheduler above.
 
 **The evolving system** (`engine/system.js`) holds five macros — `density`,
 `brightness`, `space`, `drift`, `motion` — as `{value, target}` pairs. Each frame
@@ -94,11 +110,24 @@ Three limiters, each with a distinct job — **important and easy to get wrong**
   limiting so it can never reintroduce clipping.
 
 `evening` is a low-pass on the main bus, wide open (20 kHz) by default, clamped to
-1.5 kHz when toggled on. The recording tap (`recordDest`) is at the very end.
+1.5 kHz when toggled on.
+
+**Output path & background playback.** The final mix runs `userVol -> analyser ->
+ctx.destination` (the direct speaker path) and also `userVol -> recordDest` (a
+`MediaStreamDestination` used both for recording *and* as a mobile output path). On
+start, `main.js` plays `recordDest.stream` through an `<audio>` element and calls
+`graph.detachSpeakers()` to drop the direct path (so output isn't doubled): Chrome
+suspends a bare AudioContext when the screen locks but keeps an `<audio>` element
+playing, so this is what keeps the soundscape alive with the screen off. The
+context is created with `latencyHint` set to **2× the platform's `'playback'`
+buffer** (probed at startup) — latency is irrelevant here, and the large buffer is
+the headroom that keeps weak devices from underrunning into crackle.
 
 Sends and effects:
 - `reverb.js` — a *synthesized* impulse response (decaying stereo noise) into a
-  `ConvolverNode`. The "Space" macro sets the wet return.
+  `ConvolverNode`. The "Space" macro sets the wet return. The IR is **2.5 s** (cut
+  from 5.5 s): this single always-on convolver is the heaviest node in the graph
+  and ran the phone out of real-time DSP budget — see **Mobile playback** below.
 - `delay.js` — ping-pong delay (cross-fed delay lines). The "Motion" macro sets
   wet/feedback. Its output goes to master **and** into `reverbSend`, so echoes sit
   in the shared room (this is what blends the motes spatially — don't remove it
@@ -115,6 +144,46 @@ Controls write to `system.nudge(...)` (macros), `system.setFrozen`, and the
 `graph.set*` helpers (`setVolume`, `setSubLevel`, `setEvening`). Sliders lock a
 macro's autonomous walk only while held. The panel is built imperatively from the
 voices array and macro list, so adding a voice or macro propagates automatically.
+
+## Mobile playback & performance
+
+Chrome on Android is the stress case. Findings from debugging crackle/breakup on a
+phone (and the fixes already in place):
+
+- **Screen-off first broke up badly, then — once the worklet clock landed — kept
+  playing.** The breakup was scheduler starvation: `setInterval` is throttled to
+  ~1 Hz on a hidden page, so with the old 120 ms lookahead there were ~900 ms holes
+  with nothing scheduled. A bare AudioContext is *also* suspended by Chrome on
+  screen-lock. Fixed by the AudioWorklet clock + visibility-aware lookahead (keeps
+  triggered voices scheduled) and the `<audio>`/MediaStream output path (keeps the
+  context running). Both are described above.
+- **Steady crackle was DSP saturation, not underruns.** Doubling the audio buffer
+  (`latencyHint`) changed *nothing*; halving the reverb IR (5.5 → 2.5 s) helped a
+  lot. So the phone was at/over its real-time DSP budget and the only real lever is
+  *doing less work per sample* — more buffering can't help. The convolution reverb
+  is the dominant cost (cost scales with IR length and is paid even on silence).
+- **Polyphony was uncapped.** `motes.js` and `pad.js` created oscillators per onset
+  with no limit; density blooms (regime changes) stacked dozens. Now capped (motes
+  14 voices, pad 24 oscillators) — excess onsets are dropped, inaudibly sparse.
+
+Current state is much improved. **Residual issues + proposed fixes (not yet done):**
+
+- **Bursts of crackle for a few seconds after the screen toggles on/off.** Mostly
+  the Android CPU governor changing clocks/cores across the power transition (hence
+  "settles after a few seconds"), plus the `<audio>` pipeline rebuffering and, on
+  screen-*on*, the canvas (rAF) resuming abruptly. *Proposed:* lighten the canvas on
+  mobile (throttle FPS, stop allocating gradients every frame, ease it in on
+  resume). Won't fully vanish — it's partly OS-level.
+- **Rare crackle during normal running.** Residual DSP spikes (density blooms; GC
+  from per-frame canvas allocation). *Proposed:* the canvas cleanup above + the
+  algorithmic reverb below.
+- **Biggest remaining lever: replace the convolution reverb with a cheap
+  algorithmic one** (Schroeder/FDN — a few delays + filters). Frees the most
+  sustained CPU and would let us restore a lusher tail than the dry 2.5 s IR.
+- **Last resort:** lower the mobile sample rate (e.g. 32 kHz, broad ~27 % cut),
+  avoided so far for the high-end loss (motes are already low-passed at 16 kHz).
+- **Out of our control:** the brief glitch when another app's notification sound
+  steals audio focus (Android ducking).
 
 ## Conventions
 

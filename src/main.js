@@ -88,6 +88,20 @@ function start() {
   graph.fadeIn(5, 0.85);
   scheduler.start();
 
+  // Keep the sound alive with the screen off (mobile). Chrome suspends a bare
+  // AudioContext when the screen locks, but keeps an <audio> element playing. So
+  // we pipe the final mix through one via recordDest.stream; once it's playing,
+  // drop the direct speaker path so output isn't doubled. If the browser refuses
+  // element playback, the direct path stays and desktop is unaffected.
+  const sink = new Audio();
+  sink.srcObject = graph.recordDest.stream;
+  const played = sink.play();
+  if (played && played.then) played.then(() => graph.detachSpeakers()).catch(() => {});
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: 'Aeon', artist: 'generative ambient soundscape' });
+    navigator.mediaSession.playbackState = 'playing';
+  }
+
   let last = performance.now();
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
@@ -101,11 +115,26 @@ function start() {
   }
   requestAnimationFrame(loop);
 
-  // Toggle the panel with H (a clean, uncluttered default).
+  // Coming back from a screen-off / backgrounded state, make sure both the
+  // context and the <audio> sink are running again (some mobile builds pause
+  // one or the other regardless of the keepalive above).
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    if (sink.paused) sink.play().catch(() => {});
+  });
+
+  // Hide/show the control panel. H on desktop; a tap target on mobile (no
+  // keyboard) — without it the full-width mobile panel hides the whole canvas.
+  const togglePanel = () => document.body.classList.toggle('panel-hidden');
+  const toggleBtn = document.createElement('button');
+  toggleBtn.id = 'panel-toggle';
+  toggleBtn.setAttribute('aria-label', 'show or hide controls');
+  toggleBtn.textContent = '☰';
+  toggleBtn.addEventListener('click', togglePanel);
+  document.body.appendChild(toggleBtn);
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'h' || e.key === 'H') {
-      document.body.classList.toggle('panel-hidden');
-    }
+    if (e.key === 'h' || e.key === 'H') togglePanel();
   });
 }
 

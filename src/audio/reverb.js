@@ -3,7 +3,7 @@
 // at startup. "Space" controls the wet return level (IR length is fixed; bigger
 // spaces are conveyed by more wet + the parallel delay).
 
-export function createReverb(ctx, rng, { seconds = 5.5, decay = 3.2 } = {}) {
+export function createReverb(ctx, rng, { seconds = 2.5, decay = 3.2 } = {}) {
   const len = Math.floor(ctx.sampleRate * seconds);
   const ir = ctx.createBuffer(2, len, ctx.sampleRate);
 

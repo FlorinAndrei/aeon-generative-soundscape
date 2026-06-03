@@ -26,7 +26,15 @@ export function createPad(ctx, graph, system, rng, _noise, emit) {
 
   let level = 0;
 
+  // Cap concurrent oscillators. Swells are long (up to ~27s) and overlap freely;
+  // at high density they'd stack into dozens of triangle oscillators and starve
+  // the audio thread on mobile. Past the cap we skip the whole swell (never a
+  // partial chord) — they overlap so densely that a dropped one isn't missed.
+  const MAX_OSC = 24;
+  let activeOsc = 0;
+
   function trigger(time) {
+    if (activeOsc >= MAX_OSC) return;
     const center = 52 + Math.floor(system.val('brightness') * 12); // ~E3..E4
     const size = rng.int(3, 4);
     const chord = scaleChord(system.rootPc, system.scaleName, center, size, rng);
@@ -54,6 +62,8 @@ export function createPad(ctx, graph, system, rng, _noise, emit) {
       g.gain.setValueAtTime(peak, time + attack + sustain);
       g.gain.exponentialRampToValueAtTime(0.0001, time + attack + sustain + release);
       o.stop(time + attack + sustain + release + 0.2);
+      activeOsc++;
+      o.onended = () => { activeOsc--; };
     }
 
     level = Math.min(1, level + 0.5);

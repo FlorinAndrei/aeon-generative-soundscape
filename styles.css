@@ -199,7 +199,29 @@ input[type='range']::-moz-range-thumb {
   letter-spacing: 0.08em;
 }
 
+/* ---- Panel toggle (always-visible tap target; mirrors the H key) ---- */
+#panel-toggle {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 11; /* above the panel (which can cover the full width on mobile) */
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  color: var(--fg);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+#panel-toggle:hover { color: #fff; border-color: rgba(255, 255, 255, 0.25); }
+
 @media (max-width: 560px) {
-  #panel { width: 100vw; }
+  /* Keep a strip of canvas visible beside the panel; the toggle hides it fully. */
+  #panel { width: min(300px, 82vw); }
   .overlay-inner h1 { font-size: 44px; }
 }
