@@ -50,6 +50,11 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
   const MAX_VOICES = 14;
   let active = 0;
 
+  // Onsets are scheduled ahead of when they sound, so defer the visual level
+  // bump until its `time` arrives (drained in updateFrame) — same reason the
+  // ripple emit is deferred by the event bus. Bumps are pushed in time order.
+  const bumps = [];
+
   function trigger(time) {
     if (active >= MAX_VOICES) return;
     // Choose a note from the upper register of the current scale.
@@ -100,7 +105,8 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
     active++;
     carrier.onended = () => { active--; };
 
-    level = Math.min(1, level + 0.6);
+    bumps.push(time);
+    if (bumps.length > 64) bumps.shift(); // backstop while hidden (updateFrame paused)
     if (emit) emit('mote', { time, pan: pan.pan.value, midi, strength: peak * 6 });
   }
 
@@ -119,7 +125,12 @@ export function createMotes(ctx, graph, system, rng, _noise, emit) {
     setMuted(m) {
       muteGain.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.15);
     },
-    updateFrame() {
+    updateFrame(now) {
+      // Apply bumps now due; drop any that missed their moment (page was hidden)
+      // so we don't snap the orb on return.
+      while (bumps.length && bumps[0] <= now) {
+        if (bumps.shift() >= now - 0.3) level = Math.min(1, level + 0.6);
+      }
       level *= 0.93;
     },
     getLevel: () => level,

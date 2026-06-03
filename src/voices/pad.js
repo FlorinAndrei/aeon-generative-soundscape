@@ -33,6 +33,11 @@ export function createPad(ctx, graph, system, rng, _noise, emit) {
   const MAX_OSC = 24;
   let activeOsc = 0;
 
+  // Swells are scheduled ahead of when they sound, so defer the visual level
+  // bump until its `time` arrives (drained in updateFrame) — same reason the
+  // ripple emit is deferred by the event bus. Bumps are pushed in time order.
+  const bumps = [];
+
   function trigger(time) {
     if (activeOsc >= MAX_OSC) return;
     const center = 52 + Math.floor(system.val('brightness') * 12); // ~E3..E4
@@ -66,7 +71,8 @@ export function createPad(ctx, graph, system, rng, _noise, emit) {
       o.onended = () => { activeOsc--; };
     }
 
-    level = Math.min(1, level + 0.5);
+    bumps.push(time);
+    if (bumps.length > 64) bumps.shift(); // backstop while hidden (updateFrame paused)
     if (emit) emit('pad', { time, strength: 0.6 });
   }
 
@@ -84,7 +90,12 @@ export function createPad(ctx, graph, system, rng, _noise, emit) {
     setMuted(m) {
       muteGain.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.2);
     },
-    updateFrame() {
+    updateFrame(now) {
+      // Apply bumps now due; drop any that missed their moment (page was hidden)
+      // so we don't snap the orb on return.
+      while (bumps.length && bumps[0] <= now) {
+        if (bumps.shift() >= now - 0.3) level = Math.min(1, level + 0.5);
+      }
       level *= 0.985; // visual envelope decay
     },
     getLevel: () => level,

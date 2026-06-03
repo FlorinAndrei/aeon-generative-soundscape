@@ -9,11 +9,14 @@ Demo: https://florinandrei.github.io/aeon-generative-soundscape/
 
 ## Run it locally
 
-No build step and no dependencies — just static files. Serve the directory and
-open it in a browser:
+No build step and no dependencies — just static files. Serve the directory **with
+caching disabled** and open it in a browser. Always disable caching: the app is
+plain ES modules with no build step, so a normal server lets the browser hold on
+to stale modules — you can edit a file, reload, and still be running the old code.
 
 ```sh
-python3 -m http.server 8137
+# http.server has no cache flag, so send Cache-Control: no-store ourselves.
+python3 -c "import http.server as s; H=s.SimpleHTTPRequestHandler; _e=H.end_headers; H.end_headers=lambda self:(self.send_header('Cache-Control','no-store'),_e(self)); s.test(HandlerClass=H,port=8137)"
 # then open http://localhost:8137/index.html
 ```
 

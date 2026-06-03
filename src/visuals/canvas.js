@@ -12,9 +12,21 @@ const HUES = {
   lydian: 50,
 };
 
-export function createCanvas(canvas, system, voices, analyser, events) {
+export function createCanvas(canvas, system, voices, analyser, events, clock) {
   const ctx = canvas.getContext('2d');
   const freqData = new Uint8Array(analyser.frequencyBinCount);
+
+  // The analyser taps the signal ~0.3s before it leaves the speaker, so a live
+  // haze would lead the sound like everything else. We keep a short history of
+  // the bins we plot and draw the snapshot from `clock.audible()` ago — the one
+  // currently being heard. Preallocated ring (no per-frame allocation/GC, which
+  // matters on mobile); `audible`/`now` come from main.js so the delay tracks the
+  // device's real output latency. Falls back to the live spectrum with no clock.
+  const HAZE_BINS = 64;
+  const HIST = 64; // ~1s at 60fps / ~0.5s at 120fps — comfortably covers the latency
+  const hazeRing = Array.from({ length: HIST }, () => new Uint8Array(HAZE_BINS));
+  const hazeAt = new Float64Array(HIST);
+  let hazeHead = 0, hazeCount = 0;
 
   const ripples = [];
   // One orb per voice with a slow independent drift.
@@ -83,12 +95,34 @@ export function createCanvas(canvas, system, voices, analyser, events) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Analyser haze along the bottom.
+    // Analyser haze along the bottom, delayed to the audible spectrum.
     analyser.getByteFrequencyData(freqData);
+    let haze = freqData; // live fallback if no clock
+    if (clock) {
+      const slot = hazeRing[hazeHead];
+      for (let i = 0; i < HAZE_BINS; i++) slot[i] = freqData[i];
+      hazeAt[hazeHead] = clock.now();
+      hazeHead = (hazeHead + 1) % HIST;
+      if (hazeCount < HIST) hazeCount++;
+      // Pick the most recent snapshot at or before the audible time. If the
+      // buffer doesn't reach that far back (only possible at very high latency +
+      // refresh rate), fall back to the OLDEST snapshot we have — the maximum
+      // delay available — rather than the live spectrum, so it degrades toward
+      // more compensation, never back to none.
+      const want = clock.audible();
+      let chosen = null, oldest = null;
+      let bestT = -Infinity, oldestT = Infinity;
+      for (let k = 0; k < hazeCount; k++) {
+        const t = hazeAt[k];
+        if (t <= want && t > bestT) { bestT = t; chosen = hazeRing[k]; }
+        if (t < oldestT) { oldestT = t; oldest = hazeRing[k]; }
+      }
+      haze = chosen || oldest || freqData;
+    }
     ctx.globalCompositeOperation = 'lighter';
-    const bins = 64;
+    const bins = HAZE_BINS;
     for (let i = 0; i < bins; i++) {
-      const v = freqData[i] / 255;
+      const v = haze[i] / 255;
       const x = (i / bins) * W;
       const h = v * H * 0.25;
       ctx.fillStyle = `hsla(${baseHue + i * 1.5}, 70%, 55%, ${0.04 + v * 0.06})`;

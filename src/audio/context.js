@@ -9,8 +9,9 @@
 export function createAudioGraph() {
   // We trade latency for a big stability margin: this is an ambient instrument
   // with no real-time interaction, and a larger output buffer is what lets the
-  // render thread ride through CPU spikes (and the burst when a phone screen
-  // switches on/off) without underrunning into crackle. latencyHint accepts a
+  // render thread ride through CPU spikes without underrunning into crackle.
+  // (It does NOT help the screen on/off hiccups — those are OS thread-throttling
+  // at the power transition, not buffer underruns.) latencyHint accepts a
   // number of seconds, which the browser maps to a buffer size — so we probe the
   // platform's own 'playback' latency and then ask for double that, for extra
   // headroom on weak devices. (A fixed number could be smaller than a phone's
@@ -109,9 +110,9 @@ export function createAudioGraph() {
 
   // Direct speaker path is `analyser -> ctx.destination` above. On mobile we
   // instead play the mix through an <audio> element fed by `recordDest.stream`
-  // (see main.js), because Chrome suspends a bare AudioContext when the screen
-  // locks but keeps media-element playback alive. detachSpeakers() drops the
-  // direct path once the element is playing, so the sound isn't doubled.
+  // (see main.js) to keep audio running while the tab is backgrounded/locked.
+  // detachSpeakers() drops the direct path once the element is playing, so the
+  // sound isn't doubled.
   let speakersAttached = true;
 
   return {
