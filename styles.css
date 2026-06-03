@@ -142,28 +142,6 @@ input[type='range']::-moz-range-thumb {
 }
 .seed-input { flex: 1; min-width: 0; }
 
-/* ---- Hint ---- */
-#hint {
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--fg-dim);
-  opacity: 0;
-  transition: opacity 1s;
-  pointer-events: none;
-}
-body.started #hint { opacity: 0.55; animation: fadeHint 6s ease forwards; }
-@keyframes fadeHint { 0%,70% { opacity: 0.55; } 100% { opacity: 0; } }
-#hint kbd {
-  font-family: inherit;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-}
-
 /* ---- Start overlay ---- */
 #overlay {
   position: fixed;

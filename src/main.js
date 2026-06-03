@@ -113,6 +113,5 @@ function start() {
 const overlay = document.getElementById('overlay');
 overlay.addEventListener('click', () => {
   overlay.classList.add('gone');
-  document.body.classList.add('started');
   start();
 }, { once: true });
