@@ -88,18 +88,25 @@ function start() {
   graph.fadeIn(5, 0.85);
   scheduler.start();
 
-  // Keep the sound alive with the screen off (mobile). Chrome suspends a bare
-  // AudioContext when the screen locks, but keeps an <audio> element playing. So
-  // we pipe the final mix through one via recordDest.stream; once it's playing,
-  // drop the direct speaker path so output isn't doubled. If the browser refuses
-  // element playback, the direct path stays and desktop is unaffected.
-  const sink = new Audio();
-  sink.srcObject = graph.recordDest.stream;
-  const played = sink.play();
-  if (played && played.then) played.then(() => graph.detachSpeakers()).catch(() => {});
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({ title: 'Aeon', artist: 'generative ambient soundscape' });
-    navigator.mediaSession.playbackState = 'playing';
+  // Keep the sound alive with the screen off — touch devices only. Chrome on a
+  // phone suspends a bare AudioContext when the screen locks but keeps an <audio>
+  // element playing, so we pipe the final mix through one via recordDest.stream
+  // and (once it's playing) drop the direct speaker path so output isn't doubled.
+  // Desktop never has the screen-lock problem, and the MediaStream/<audio>
+  // pipeline crackles for the first few seconds while it settles — so we skip it
+  // there and keep the clean, direct ctx.destination path. The gate matches the
+  // problem: Android suspends on lock, desktop doesn't.
+  let sink = null;
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  if (touch) {
+    sink = new Audio();
+    sink.srcObject = graph.recordDest.stream;
+    const played = sink.play();
+    if (played && played.then) played.then(() => graph.detachSpeakers()).catch(() => {});
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'Aeon', artist: 'generative ambient soundscape' });
+      navigator.mediaSession.playbackState = 'playing';
+    }
   }
 
   let last = performance.now();
@@ -121,7 +128,7 @@ function start() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     if (ctx.state === 'suspended') ctx.resume();
-    if (sink.paused) sink.play().catch(() => {});
+    if (sink && sink.paused) sink.play().catch(() => {});
   });
 
   // Hide/show the control panel. H on desktop; a tap target on mobile (no

@@ -114,14 +114,18 @@ Three limiters, each with a distinct job — **important and easy to get wrong**
 
 **Output path & background playback.** The final mix runs `userVol -> analyser ->
 ctx.destination` (the direct speaker path) and also `userVol -> recordDest` (a
-`MediaStreamDestination` used both for recording *and* as a mobile output path). On
-start, `main.js` plays `recordDest.stream` through an `<audio>` element and calls
+`MediaStreamDestination` used for recording). **On touch devices only**, `main.js`
+also plays `recordDest.stream` through an `<audio>` element and calls
 `graph.detachSpeakers()` to drop the direct path (so output isn't doubled): Chrome
-suspends a bare AudioContext when the screen locks but keeps an `<audio>` element
-playing, so this is what keeps the soundscape alive with the screen off. The
-context is created with `latencyHint` set to **2× the platform's `'playback'`
-buffer** (probed at startup) — latency is irrelevant here, and the large buffer is
-the headroom that keeps weak devices from underrunning into crackle.
+on a phone suspends a bare AudioContext when the screen locks but keeps an
+`<audio>` element playing, so this is what keeps the soundscape alive with the
+screen off. Desktop keeps the direct path — it has no screen-lock suspension, and
+the MediaStream/`<audio>` pipeline crackles for the first few seconds while it
+settles, so the `(pointer: coarse)` gate confines that cost to where the problem
+exists. The context is created with `latencyHint` set to **2× the platform's
+`'playback'` buffer** (probed at startup) — latency is irrelevant here, and the
+large buffer is the headroom that keeps weak devices from underrunning into
+crackle.
 
 Sends and effects:
 - `reverb.js` — a *synthesized* impulse response (decaying stereo noise) into a
