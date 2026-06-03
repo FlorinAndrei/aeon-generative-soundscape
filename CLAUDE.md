@@ -33,7 +33,7 @@ There are no automated tests. Verify by driving the real app in a browser
 (Playwright MCP is the tool used during development):
 
 1. Navigate to the served URL, click `#overlay` to start.
-2. Check the console — the only expected error is a `favicon.ico` 404.
+2. Check the console — it should be clean (no errors).
 3. The canvas analyser haze only plots the lowest ~64 FFT bins (≈0–2.7 kHz), so
    it's useful for confirming low-end/soloed-voice energy but **cannot** show
    high-frequency changes (e.g. the motes' 16 kHz low-pass). Those need ears.
