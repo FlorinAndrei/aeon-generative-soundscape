@@ -35,11 +35,17 @@ on its own over time.
 
 ## Controls
 
-Press **H** to show/hide the panel.
+Press **H** — or tap the **☰** button — to show/hide the panel.
 
 - **Volume / Sub** — master level and how loud the low end sits
 - **Density, Brightness, Space, Drift, Motion** — macro "tendencies" that nudge
-  the system; it eases toward them with inertia rather than snapping
+  the system; it eases toward them with inertia rather than snapping:
+  - **Density** — how often the pads and motes fire (sparse drips → busy texture)
+  - **Brightness** — tone and sparkle (filter openness and the motes' FM richness)
+  - **Space** — reverb wetness, the sense of a larger room around the sound
+  - **Drift** — how fast the system mutates itself (steady → restless, more
+    frequent key/mood changes)
+  - **Motion** — delay/echo amount and stereo movement across the field
 - **Freeze** — hold the current moment (pauses the autonomous drift; you can
   still nudge)
 - **Evening** — a warm low-pass over everything

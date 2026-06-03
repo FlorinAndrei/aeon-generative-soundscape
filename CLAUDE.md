@@ -187,6 +187,8 @@ Current state is much improved. **Residual issues + proposed fixes (not yet done
 
 ## Conventions
 
+- This repo commits **directly to `main`** — no feature branches, no PRs. Commit
+  there when asked.
 - Vanilla ES modules only. No frameworks, no bundler, no deps. Keep it that way.
 - Comment density and naming match the existing files — short "why" comments above
   non-obvious audio routing, not narration of obvious code.
