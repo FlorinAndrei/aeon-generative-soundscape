@@ -1,22 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Aeon — a generative ambient soundscape</title>
-  <meta name="description" content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
+  <title>Aeon — a generative ambient soundscape instrument that runs entirely in the browser</title>
+  <meta name="description"
+    content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
 
   <!-- Social preview (Open Graph + Twitter Card). Crawlers need absolute URLs. -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Aeon — a generative ambient soundscape" />
-  <meta property="og:description" content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
+  <meta property="og:title"
+    content="Aeon — a generative ambient soundscape instrument that runs entirely in the browser" />
+  <meta property="og:description"
+    content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
   <meta property="og:url" content="https://florinandrei.github.io/aeon-generative-soundscape/" />
   <meta property="og:image" content="https://florinandrei.github.io/aeon-generative-soundscape/logo.png" />
   <meta property="og:image:width" content="1280" />
   <meta property="og:image:height" content="620" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Aeon — a generative ambient soundscape" />
-  <meta name="twitter:description" content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
+  <meta name="twitter:title"
+    content="Aeon — a generative ambient soundscape instrument that runs entirely in the browser" />
+  <meta name="twitter:description"
+    content="A browser instrument that synthesizes an endlessly evolving ambient soundscape live with the Web Audio API — no samples, no recordings." />
   <meta name="twitter:image" content="https://florinandrei.github.io/aeon-generative-soundscape/logo.png" />
 
   <!-- Relative href so it resolves under the GitHub Pages subpath too (the
@@ -25,6 +31,7 @@
   <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <canvas id="scene"></canvas>
 
@@ -34,7 +41,7 @@
     <div class="overlay-inner">
       <h1>Aeon</h1>
       <p>a generative ambient soundscape — synthesized live, evolving on its own.<br />
-         nudge it, but you'll never quite hold it still.</p>
+        nudge it, but you'll never quite hold it still.</p>
       <button class="begin">tap to begin</button>
       <small>headphones recommended · press H to hide the controls</small>
     </div>
@@ -42,4 +49,5 @@
 
   <script type="module" src="src/main.js"></script>
 </body>
+
 </html>
