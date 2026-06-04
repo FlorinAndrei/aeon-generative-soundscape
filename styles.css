@@ -1,5 +1,14 @@
 :root {
-  --panel-bg: rgba(12, 14, 22, 0.72);
+  /* Render native UI (scrollbars, form widgets, popups) dark to match the app. */
+  color-scheme: dark;
+
+  /* The panel's base color as raw RGB channels, so one edit re-tints every
+     surface. --panel-bg layers it translucently over the page; --surface is the
+     opaque version native popups need (the <select> option list paints over a
+     white canvas, where a translucent color would wash out — see .select option). */
+  --panel-rgb: 12, 14, 22;
+  --panel-bg: rgba(var(--panel-rgb), 0.72);
+  --surface: rgb(var(--panel-rgb));
   --panel-border: rgba(255, 255, 255, 0.08);
   --fg: rgba(235, 240, 255, 0.9);
   --fg-dim: rgba(235, 240, 255, 0.5);
@@ -141,6 +150,15 @@ input[type='range']::-moz-range-thumb {
   color: var(--fg);
 }
 .seed-input { flex: 1; min-width: 0; }
+
+/* The <select> sets a near-transparent background that reads as dark over the
+   panel — but Chrome on Windows paints the open option list on that same color,
+   which lands on white. Give the options a solid dark background so the list is
+   readable. (macOS renders the popup dark on its own; this just matches it.) */
+.select option {
+  background: var(--surface);
+  color: var(--fg);
+}
 
 /* ---- Start overlay ---- */
 #overlay {
