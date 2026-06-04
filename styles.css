@@ -2,17 +2,38 @@
   /* Render native UI (scrollbars, form widgets, popups) dark to match the app. */
   color-scheme: dark;
 
-  /* The panel's base color as raw RGB channels, so one edit re-tints every
-     surface. --panel-bg layers it translucently over the page; --surface is the
-     opaque version native popups need (the <select> option list paints over a
-     white canvas, where a translucent color would wash out — see .select option). */
+  /* Theme palette — every static color in the UI lives here. Colors that appear
+     at several opacities are stored as raw "r, g, b" channels (--*-rgb) so one
+     edit re-tints all of them; the rgba() wrappers below pick the opacity.
+
+     Surface — the panel; --panel-bg layers it translucently over the page,
+     --surface is the opaque version native popups need (the <select> list paints
+     over a white canvas, where a translucent color would wash out). */
   --panel-rgb: 12, 14, 22;
   --panel-bg: rgba(var(--panel-rgb), 0.72);
   --surface: rgb(var(--panel-rgb));
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --fg: rgba(235, 240, 255, 0.9);
-  --fg-dim: rgba(235, 240, 255, 0.5);
-  --accent: rgba(140, 190, 255, 0.9);
+
+  /* Background — the page void and the start-overlay gradient. */
+  --bg: #05060a;
+  --bg-2: #0a0e1c;
+
+  /* Accent — interactive blue (sliders, active chips, start button). */
+  --accent-rgb: 140, 190, 255;
+  --accent: rgba(var(--accent-rgb), 0.9);
+
+  /* Text. */
+  --fg-rgb: 235, 240, 255;
+  --fg: rgba(var(--fg-rgb), 0.9);
+  --fg-dim: rgba(var(--fg-rgb), 0.5);
+
+  /* Highlight — white overlays for borders and subtle fills. */
+  --hi-rgb: 255, 255, 255;
+  --panel-border: rgba(var(--hi-rgb), 0.08);
+
+  /* Title — the "Aeon" heading gradient. */
+  --grad-1: #9cc4ff;
+  --grad-2: #c9a8ff;
+  --grad-3: #8ce0d0;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +42,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #05060a;
+  background: var(--bg);
   color: var(--fg);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -81,7 +102,7 @@ input[type='range'] {
   appearance: none;
   height: 3px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--hi-rgb), 0.14);
   outline: none;
 }
 input[type='range']::-webkit-slider-thumb {
@@ -91,7 +112,7 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 12px rgba(140, 190, 255, 0.6);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6);
 }
 input[type='range']::-moz-range-thumb {
   width: 16px; height: 16px; border: none; border-radius: 50%;
@@ -118,14 +139,14 @@ input[type='range']::-moz-range-thumb {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--hi-rgb), 0.04);
   color: var(--fg-dim);
   cursor: pointer;
   transition: all 0.2s;
 }
-.chip:hover { color: var(--fg); border-color: rgba(255, 255, 255, 0.25); }
+.chip:hover { color: var(--fg); border-color: rgba(var(--hi-rgb), 0.25); }
 .chip.on {
-  color: #05060a;
+  color: var(--bg);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -146,7 +167,7 @@ input[type='range']::-moz-range-thumb {
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--hi-rgb), 0.04);
   color: var(--fg);
 }
 .seed-input { flex: 1; min-width: 0; }
@@ -166,7 +187,7 @@ input[type='range']::-moz-range-thumb {
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #0a0e1c 0%, #05060a 70%);
+  background: radial-gradient(ellipse at center, var(--bg-2) 0%, var(--bg) 70%);
   z-index: 10;
   transition: opacity 1.2s ease;
   text-align: center;
@@ -180,7 +201,7 @@ input[type='range']::-moz-range-thumb {
   letter-spacing: 0.3em;
   margin: 0 0 18px;
   padding-left: 0.3em;
-  background: linear-gradient(120deg, #9cc4ff, #c9a8ff, #8ce0d0);
+  background: linear-gradient(120deg, var(--grad-1), var(--grad-2), var(--grad-3));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -198,21 +219,21 @@ input[type='range']::-moz-range-thumb {
   text-transform: uppercase;
   padding: 14px 34px;
   border-radius: 999px;
-  border: 1px solid rgba(140, 190, 255, 0.4);
-  background: rgba(140, 190, 255, 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.08);
   color: var(--fg);
   cursor: pointer;
   transition: all 0.3s;
 }
 .begin:hover {
-  background: rgba(140, 190, 255, 0.18);
+  background: rgba(var(--accent-rgb), 0.18);
   border-color: var(--accent);
-  box-shadow: 0 0 30px rgba(140, 190, 255, 0.25);
+  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.25);
 }
 .overlay-inner small {
   display: block;
   margin-top: 26px;
-  color: rgba(235, 240, 255, 0.3);
+  color: rgba(var(--fg-rgb), 0.3);
   font-size: 11px;
   letter-spacing: 0.08em;
 }
@@ -236,7 +257,7 @@ input[type='range']::-moz-range-thumb {
   cursor: pointer;
   transition: color 0.2s, border-color 0.2s;
 }
-#panel-toggle:hover { color: #fff; border-color: rgba(255, 255, 255, 0.25); }
+#panel-toggle:hover { color: rgb(var(--hi-rgb)); border-color: rgba(var(--hi-rgb), 0.25); }
 
 @media (max-width: 560px) {
   /* Keep a strip of canvas visible beside the panel; the toggle hides it fully. */

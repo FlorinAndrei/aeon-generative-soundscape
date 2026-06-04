@@ -4,12 +4,29 @@
 // and expanding ripples emitted when motes/pads fire. Steered the same way you
 // steer the sound — by tendency, not by frame.
 
-const HUES = {
-  'major-pentatonic': 200,
-  'minor-pentatonic': 260,
-  dorian: 170,
-  aeolian: 285,
-  lydian: 50,
+// Visual palette — the canvas's color identity in one place (its half of the
+// theme; the UI chrome's half lives in styles.css :root). Hue comes from the
+// musical scale (mood) plus a per-voice offset; the saturation/lightness here are
+// each layer's static character. The opacities and the lightness that track
+// brightness/level/space stay inline in the draw loop — those are behavior, not
+// palette. Saturation/lightness are percentages.
+const PALETTE = {
+  // Base hue per scale (mood color); fallback when a scale isn't mapped.
+  scaleHue: {
+    'major-pentatonic': 200,
+    'minor-pentatonic': 260,
+    dorian: 170,
+    aeolian: 285,
+    lydian: 50,
+  },
+  fallbackHue: 220,
+  // Hue offset per voice orb, relative to the base hue.
+  voiceHueOffset: { motes: 60, air: -30, sub: -70 },
+  bg: { sat: 40 },                                  // background fill
+  glow: { hueShift: 20, sat: 50 },                  // radial mood glow over it
+  haze: { hueSpread: 1.5, sat: 70, light: 55 },     // analyser haze; hue fans out per bin
+  orb: { sat: 80, light: 65 },                      // drifting per-voice orbs
+  ripple: { hueShift: 40, sat: 85, light: 70 },     // mote/pad ripples
 };
 
 export function createCanvas(canvas, system, voices, analyser, events, clock) {
@@ -59,7 +76,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
         r: 0,
         max: 0.12 + (data.strength || 0.5) * 0.1,
         life: 1,
-        hue: HUES[system.scaleName] ?? 220,
+        hue: PALETTE.scaleHue[system.scaleName] ?? PALETTE.fallbackHue,
       });
     } else if (type === 'pad') {
       ripples.push({
@@ -69,7 +86,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
         max: 0.5,
         life: 1,
         slow: true,
-        hue: HUES[system.scaleName] ?? 220,
+        hue: PALETTE.scaleHue[system.scaleName] ?? PALETTE.fallbackHue,
       });
     }
     if (ripples.length > 80) ripples.splice(0, ripples.length - 80);
@@ -81,16 +98,16 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
 
-    const baseHue = HUES[system.scaleName] ?? 220;
+    const baseHue = PALETTE.scaleHue[system.scaleName] ?? PALETTE.fallbackHue;
     const bright = system.val('brightness');
     const space = system.val('space');
 
     // Background: deep gradient that shifts with mood + brightness.
     const bgL = 4 + bright * 8;
-    ctx.fillStyle = `hsl(${baseHue}, 40%, ${bgL}%)`;
+    ctx.fillStyle = `hsl(${baseHue}, ${PALETTE.bg.sat}%, ${bgL}%)`;
     ctx.fillRect(0, 0, W, H);
     const grad = ctx.createRadialGradient(W * 0.5, H * 0.55, 0, W * 0.5, H * 0.55, Math.max(W, H) * 0.7);
-    grad.addColorStop(0, `hsla(${baseHue + 20}, 50%, ${10 + bright * 12}%, 0.6)`);
+    grad.addColorStop(0, `hsla(${baseHue + PALETTE.glow.hueShift}, ${PALETTE.glow.sat}%, ${10 + bright * 12}%, 0.6)`);
     grad.addColorStop(1, 'hsla(0,0%,0%,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
@@ -125,7 +142,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
       const v = haze[i] / 255;
       const x = (i / bins) * W;
       const h = v * H * 0.25;
-      ctx.fillStyle = `hsla(${baseHue + i * 1.5}, 70%, 55%, ${0.04 + v * 0.06})`;
+      ctx.fillStyle = `hsla(${baseHue + i * PALETTE.haze.hueSpread}, ${PALETTE.haze.sat}%, ${PALETTE.haze.light}%, ${0.04 + v * 0.06})`;
       ctx.fillRect(x, H - h, W / bins + 1, h);
     }
 
@@ -143,8 +160,8 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
       const cx = o.x * W;
       const cy = o.y * H;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      const hue = baseHue + (o.voice.name === 'motes' ? 60 : o.voice.name === 'air' ? -30 : o.voice.name === 'sub' ? -70 : 0);
-      g.addColorStop(0, `hsla(${hue}, 80%, 65%, ${0.10 + lvl * 0.35})`);
+      const hue = baseHue + (PALETTE.voiceHueOffset[o.voice.name] ?? 0);
+      g.addColorStop(0, `hsla(${hue}, ${PALETTE.orb.sat}%, ${PALETTE.orb.light}%, ${0.10 + lvl * 0.35})`);
       g.addColorStop(1, 'hsla(0,0%,0%,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
@@ -159,7 +176,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
       rp.life -= (rp.slow ? 0.12 : 0.45) * dt;
       if (rp.life <= 0) { ripples.splice(i, 1); continue; }
       const rr = rp.r * Math.min(W, H);
-      ctx.strokeStyle = `hsla(${rp.hue + 40}, 85%, 70%, ${rp.life * 0.5})`;
+      ctx.strokeStyle = `hsla(${rp.hue + PALETTE.ripple.hueShift}, ${PALETTE.ripple.sat}%, ${PALETTE.ripple.light}%, ${rp.life * 0.5})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(rp.x * W, rp.y * H, rr, 0, Math.PI * 2);
