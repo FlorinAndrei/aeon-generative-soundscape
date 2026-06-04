@@ -248,3 +248,12 @@ latency that value doesn't include, so the offset under-covers on the sink path
 - When adding a macro: add it to `MACROS` in `system.js`; the UI picks it up.
 - When adding a voice: implement the voice interface above, add it to the voices
   array in `main.js`; the scheduler, Layers UI, and canvas orbs follow.
+- Colors live in **two palette blocks, not inline** — and deliberately stay
+  separate (fixed UI chrome vs. the canvas's scale-reactive, generative visuals):
+  the UI palette is the `:root` block in `styles.css` (colors used at several
+  opacities are stored as `r, g, b` channel triples like `--accent-rgb`, fed to
+  `rgba(var(--accent-rgb), α)`); the canvas palette is the `PALETTE` block at the
+  top of `visuals/canvas.js` (per-scale hues + per-voice hue offsets + static
+  saturation/lightness). Opacity/lightness that track live macros stay inline in
+  the draw loop — that's behavior, not palette. Add a new color to the right
+  block; don't hardcode it at the call site.
