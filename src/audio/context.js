@@ -92,9 +92,16 @@ export function createAudioGraph() {
   const userVol = ctx.createGain();
   userVol.gain.value = 1;
 
+  // Master mute gate. Sits where both buses have already merged, so muting here
+  // silences EVERYTHING downstream — speakers, the mobile <audio>/record tap, and
+  // the analyser haze. Its own node (not userVol) so mute and the volume slider
+  // don't fight.
+  const muteGate = ctx.createGain();
+  muteGate.gain.value = 1;
+
   // Main path:  dry -> master(fade) -> evening(tone) -> mainLimiter ┐
   // Sub path:   subBus -> subLimiter ------------------------------ ┤
-  //             both -> outLimiter(safety) -> userVol -> analyser -> out / record
+  //             both -> outLimiter(safety) -> userVol -> muteGate -> analyser -> out / record
   dry.connect(master);
   master.connect(evening);
   evening.connect(limiter);
@@ -104,9 +111,10 @@ export function createAudioGraph() {
   limiter.connect(outLimiter);
   subLimiter.connect(outLimiter);
   outLimiter.connect(userVol);
-  userVol.connect(analyser);
+  userVol.connect(muteGate);
+  muteGate.connect(analyser);
   analyser.connect(ctx.destination);
-  userVol.connect(recordDest);
+  muteGate.connect(recordDest);
 
   // Direct speaker path is `analyser -> ctx.destination` above. On mobile we
   // instead play the mix through an <audio> element fed by `recordDest.stream`
@@ -124,6 +132,7 @@ export function createAudioGraph() {
     master,
     evening,
     userVol,
+    muteGate,
     limiter,
     subLimiter,
     outLimiter,
@@ -147,6 +156,10 @@ export function createAudioGraph() {
     // Engage/disengage the evening low-pass.
     setEvening(on) {
       evening.frequency.setTargetAtTime(on ? 1500 : 20000, ctx.currentTime, 0.6);
+    },
+    // Master mute: fade the whole output (both buses) to silence and back.
+    setMuted(on) {
+      muteGate.gain.setTargetAtTime(on ? 0 : 1, ctx.currentTime, 0.15);
     },
     // Drop the direct speaker path (used once the <audio> sink is playing, so
     // output isn't doubled). Idempotent and reversible.

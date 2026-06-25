@@ -63,6 +63,19 @@ export function createControls(root, { system, voices, recorder, graph, seedToke
     graph.setEvening(eveningOn);
   });
   outGroup.append(evening);
+
+  // Master mute: fade the whole output to silence (the system keeps running).
+  const mute = document.createElement('button');
+  mute.className = 'chip wide';
+  mute.textContent = 'mute';
+  let muted = false;
+  mute.addEventListener('click', () => {
+    muted = !muted;
+    mute.classList.toggle('on', muted);
+    mute.textContent = muted ? 'muted' : 'mute';
+    graph.setMuted(muted);
+  });
+  outGroup.append(mute);
   root.append(outGroup);
 
   // --- Macro sliders -------------------------------------------------------

@@ -45,6 +45,17 @@ There are no automated tests. Verify by driving the real app in a browser
 4. For anything timbral or spatial (reverb, panning, sub level, blend), confirm
    by listening — describe what to listen for and ask the user to confirm.
 
+**Playwright reaches the dev server differently depending on where it runs.** The
+MCP browser may run *inside a Docker container* (its `localhost` is the container,
+not your host — so `http://localhost:8137` gives `ERR_CONNECTION_REFUSED`; use
+`http://host.docker.internal:8137` instead) or *directly on the host* (plain
+`localhost` works). This varies machine to machine — don't assume. **Test
+reality:** start the server, confirm it answers on the host (`curl -sI
+http://localhost:8137/index.html`), then try `localhost` from the browser and fall
+back to `host.docker.internal` if the connection is refused. (If the container is
+out of disk — `ENOSPC` on `/home/node/.cache` — it's the Docker VM disk, not the
+host; `docker system df` then prune.)
+
 Always clean up Playwright artifacts (`.playwright-mcp/`, stray screenshots)
 after verifying.
 
@@ -245,6 +256,10 @@ latency that value doesn't include, so the offset under-covers on the sink path
   `linearRampToValueAtTime`; never hard-set a gain/frequency on a running node
   (clicks — brutal at low frequencies especially). Continuous voices ramp up from
   silence rather than starting at full level.
+- Control labels stay clean: plain lowercase text, **no emoji/icon glyphs** (a
+  `🔇 mute` chip was tried and pulled for clashing with the spare style). The few
+  existing symbols are minimal monochrome typographic marks, not colored emoji
+  (`❄ freeze`, `● record`); keep that bar — when in doubt, just use the word.
 - When adding a macro: add it to `MACROS` in `system.js`; the UI picks it up.
 - When adding a voice: implement the voice interface above, add it to the voices
   array in `main.js`; the scheduler, Layers UI, and canvas orbs follow.
