@@ -135,8 +135,7 @@ also plays `recordDest.stream` through an `<audio>` element and calls
 `graph.detachSpeakers()` to drop the direct path (so output isn't doubled): a
 phone backgrounds/locks the tab, and routing through an `<audio>` media element
 keeps the audio running there. Desktop has no such problem, so the `(pointer:
-coarse)` gate keeps the clean direct path. With caching off, fresh code plays
-smoothly on a phone both unlocked and locked. The context is created with
+coarse)` gate keeps the clean direct path. The context is created with
 `latencyHint` set to **2× the platform's `'playback'` buffer** (probed at startup)
 — latency is irrelevant here, and the large buffer is headroom against
 underrun-crackle on CPU spikes. **Open issue:** the `<audio>`/MediaStream sink
@@ -144,9 +143,13 @@ adds latency `ctx.outputLatency` does not report, so the A/V-sync compensation
 (see Visuals) under-covers on mobile and visuals there lead the sound.
 
 Sends and effects:
-- `reverb.js` — a *synthesized* impulse response (decaying stereo noise) into a
-  `ConvolverNode`. The "Space" macro sets the wet return. The IR is **5.5 s** —
-  this single always-on convolver is the heaviest node in the graph.
+- `reverb.js` + `reverb-worklet.js` — a feedback delay network (8 delay lines, a
+  Hadamard mixing matrix, allpass diffusers at the input) computed in an
+  **AudioWorklet**. The "Space" macro sets the wet return. It is a worklet on
+  purpose — **do not swap in a `ConvolverNode`** (see *Mobile playback &
+  performance*). If the worklet can't load (no secure context), `reverb.js` falls
+  back to the old 5.5 s convolver, fed by its own dedicated `rng` so the main
+  random stream is the same on both paths.
 - `delay.js` — ping-pong delay (cross-fed delay lines). The "Motion" macro sets
   wet/feedback. Its output goes to master **and** into `reverbSend`, so echoes sit
   in the shared room (this is what blends the motes spatially — don't remove it
@@ -184,64 +187,41 @@ voices array and macro list, so adding a voice or macro propagates automatically
 
 ## Mobile playback & performance
 
-Chrome on Android is the stress case.
+Chrome on Android is the stress case. The findings below are from tests on a
+Pixel 10a (Android 17, November 2026), with caching off and the worklets active.
+An older version of this section blamed stale cached modules for the stutter;
+that was wrong — the stutter was real.
 
-> ⚠️ **Caching caveat (read first).** The older bullets below were debugged while
-> the browser was silently running **stale cached ES modules** (no build step →
-> aggressive module caching), and on clean re-testing the mobile stutter problems
-> **did not reproduce** — so treat them as unverified. Always serve with caching
-> disabled (see *Running it*) and re-test with a hard reload. See **What clean
-> testing shows** below for the current verified picture.
-
-Older findings from debugging crackle/breakup on a phone (and the fixes in place):
-
-- **Screen-off first broke up badly, then — once the worklet clock landed — kept
-  playing.** The breakup was scheduler starvation: `setInterval` is throttled to
-  ~1 Hz on a hidden page, so with the old 120 ms lookahead there were ~900 ms holes
-  with nothing scheduled. (This bullet *also* claimed a bare AudioContext is
-  suspended by Chrome on screen-lock — **not true**; see re-validated findings.)
-  Fixed by the AudioWorklet clock + visibility-aware lookahead (keeps triggered
-  voices scheduled) and the `<audio>`/MediaStream output path (reduces screen-off
-  throttling). Both are described above.
-- **Steady crackle was DSP saturation, not underruns.** Doubling the audio buffer
-  (`latencyHint`) changed *nothing*; halving the reverb IR (5.5 → 2.5 s) helped a
-  lot. So the phone was at/over its real-time DSP budget and the only real lever is
-  *doing less work per sample* — more buffering can't help. The convolution reverb
-  is the dominant cost (cost scales with IR length and is paid even on silence).
-- **Polyphony was uncapped.** `motes.js` and `pad.js` created oscillators per onset
-  with no limit; density blooms (regime changes) stacked dozens. Now capped (motes
-  14 voices, pad 24 oscillators) — excess onsets are dropped, inaudibly sparse.
-
-### What clean testing shows (June 2026, caching off, hard-reloaded on phone)
-
-The stutter problems above were chased largely under the module-caching bug and
-**did not hold up** on clean code (5.5 s reverb, `<audio>` sink enabled, caching
-off): the phone plays **smoothly both unlocked and locked** — no startup stutter,
-no screen-off stutter. Desktop is smooth and in sync. The mid-investigation
-attempts to tie this to the sink pipeline or DSP/reverb load were chasing cache
-artifacts, not real behavior.
-
-**One confirmed open issue: on mobile, visuals lead the sound.** The A/V-sync
-compensation reads `ctx.outputLatency`, but the `<audio>`/MediaStream sink adds
-latency that value doesn't include, so the offset under-covers on the sink path
-(it's exact on the desktop direct path). Unsolved.
-
-**Older residual notes (pre-caching-fix, unverified):**
-
-- **Bursts of crackle for a few seconds after the screen toggles on/off.** Mostly
-  the Android CPU governor changing clocks/cores across the power transition (hence
-  "settles after a few seconds"), plus the `<audio>` pipeline rebuffering and, on
-  screen-*on*, the canvas (rAF) resuming abruptly. *Proposed:* lighten the canvas on
-  mobile (throttle FPS, stop allocating gradients every frame, ease it in on
-  resume). Won't fully vanish — it's partly OS-level.
-- **Rare crackle during normal running.** Residual DSP spikes (density blooms; GC
-  from per-frame canvas allocation). *Proposed:* the canvas cleanup above + the
-  algorithmic reverb below.
-- **Biggest remaining lever: replace the convolution reverb with a cheap
-  algorithmic one** (Schroeder/FDN — a few delays + filters). Frees the most
-  sustained CPU.
-- **Last resort:** lower the mobile sample rate (e.g. 32 kHz, broad ~27 % cut),
-  avoided so far for the high-end loss (motes are already low-passed at 16 kHz).
+- **A long `ConvolverNode` stutters on a phone.** Symptoms were: many seconds of
+  stutter at startup, stutter with the screen off, and heavy stutter for some
+  seconds after unlock. Cutting the impulse to 0.2 s removed all three; the
+  worklet reverb also removes all three. The probable mechanism (from memory of
+  Chrome's design, not checked in its source): only the first part of a long
+  impulse is computed on the real-time audio thread, the rest on a
+  normal-priority background thread, which falls behind when Android slows the
+  CPU. The output stream itself does not underrun, so no underrun counter shows it.
+- **Keep the 2x `'playback'` buffer.** With the plain `'playback'` buffer, startup
+  stuttered for a few seconds even with a short reverb.
+- **Keep the `<audio>` sink on touch devices.** Without it (direct speaker path)
+  the sound stuttered with the screen off (tested with the convolver).
+- **`ctx.playbackStats` is misleading on the sink path.** It measures the silent
+  direct output, not the stream that is heard: it counted hundreds of underruns
+  during smooth playback and none during audible stutter.
+- **The scheduler was never the problem.** With the worklet clock, the largest
+  tick gap with the screen off was ~50 ms and no event was scheduled late.
+- **Do not build feedback matrices from native nodes.** An FDN made of
+  `DelayNode`/`GainNode` (matrix inside the feedback cycle) was unstable in Chrome
+  — the level grew without limit, though the same matrix is stable on paper.
+  Single delay+gain loops (as in `delay.js`) are fine.
+- **Worklets need a secure context.** Over plain `http://<LAN-IP>` neither the
+  clock worklet nor the reverb worklet loads. To test on a phone over the LAN, add
+  the origin to `chrome://flags` -> "Insecure origins treated as secure" (or use
+  `adb reverse` and `localhost`).
+- **Polyphony is capped** (motes 14 voices, pad 24 oscillators); excess onsets are
+  dropped, inaudibly sparse.
+- **Open issue: on mobile, visuals lead the sound.** The A/V-sync compensation
+  reads `ctx.outputLatency`, but the `<audio>`/MediaStream sink adds latency that
+  value doesn't include (it's exact on the desktop direct path). Unsolved.
 - **Out of our control:** the brief glitch when another app's notification sound
   steals audio focus (Android ducking).
 

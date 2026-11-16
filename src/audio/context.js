@@ -10,8 +10,8 @@ export function createAudioGraph() {
   // We trade latency for a big stability margin: this is an ambient instrument
   // with no real-time interaction, and a larger output buffer is what lets the
   // render thread ride through CPU spikes without underrunning into crackle.
-  // (It does NOT help the screen on/off hiccups — those are OS thread-throttling
-  // at the power transition, not buffer underruns.) latencyHint accepts a
+  // (Tested on a phone: the plain 'playback' buffer stutters at startup.)
+  // latencyHint accepts a
   // number of seconds, which the browser maps to a buffer size — so we probe the
   // platform's own 'playback' latency and then ask for double that, for extra
   // headroom on weak devices. (A fixed number could be smaller than a phone's

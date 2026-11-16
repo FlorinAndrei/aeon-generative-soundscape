@@ -37,7 +37,9 @@ function start() {
   const { ctx } = graph;
 
   // Sends.
-  const reverb = createReverb(ctx, rng);
+  // Its own generator (used only by the reverb's convolver fallback), so the
+  // main random stream is the same whether or not the worklet loads.
+  const reverb = createReverb(ctx, makeRng(seedToken + ':reverb'));
   const delay = createDelay(ctx);
   graph.reverbSend.connect(reverb.input);
   reverb.output.connect(graph.master);
@@ -143,8 +145,7 @@ function start() {
   // recordDest.stream keeps it playing as active media. Once it's playing we drop
   // the direct speaker path so output isn't doubled. Desktop has no such problem,
   // so the (pointer: coarse) gate keeps the clean direct ctx.destination path.
-  // With caching off, fresh code plays smoothly on a phone both unlocked and
-  // locked (the stutter we once chased here was a stale-cached-module artifact).
+  // Tested: without the sink (direct path) a phone stutters with the screen off.
   // KNOWN OPEN ISSUE: the <audio>/MediaStream sink adds latency that
   // ctx.outputLatency does not report, so the A/V-sync compensation under-covers
   // on mobile and visuals there lead the sound. Unsolved — see CLAUDE.md.
