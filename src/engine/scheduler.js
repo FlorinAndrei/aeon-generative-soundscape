@@ -13,7 +13,7 @@
 // sparse wakeup then schedules enough audio to bridge the gap to the next one,
 // instead of leaving ~900ms holes that break the sound up.
 
-export function createScheduler(ctx, voices) {
+export function createScheduler(ctx, voices, rng) {
   const LOOKAHEAD_FG = 0.2; // seconds scheduled ahead when visible (absorbs main-thread jank)
   const LOOKAHEAD_BG = 1.5; // ...when hidden, to bridge throttled wakeups
   const TICK = 25; // ms between setInterval checks
@@ -61,7 +61,7 @@ export function createScheduler(ctx, voices) {
     start() {
       if (timer) return;
       const base = ctx.currentTime + 0.3;
-      for (const v of triggers) v._next = base + Math.random() * 1.5;
+      for (const v of triggers) v._next = base + rng.range(0, 1.5);
       timer = setInterval(tick, TICK);
       attachWorkletClock();
     },

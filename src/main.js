@@ -111,7 +111,7 @@ function start() {
     createAir(ctx, graph, system, rng, noise),
   ];
 
-  const scheduler = createScheduler(ctx, voices);
+  const scheduler = createScheduler(ctx, voices, rng);
   const recorder = createRecorder(graph.recordDest.stream);
 
   // Visuals.
@@ -120,7 +120,7 @@ function start() {
   // offset as the triggered visuals): `now` tags each captured spectrum, `audible`
   // says which past spectrum is the one currently leaving the speaker.
   const clock = { now: () => ctx.currentTime, audible: audibleTime };
-  createCanvas(canvasEl, system, voices, graph.analyser, events, clock);
+  createCanvas(canvasEl, system, voices, graph.analyser, events, clock, makeRng(seedToken + ':visuals'));
 
   // Controls.
   createControls(document.getElementById('panel'), {
@@ -146,9 +146,9 @@ function start() {
   // the direct speaker path so output isn't doubled. Desktop has no such problem,
   // so the (pointer: coarse) gate keeps the clean direct ctx.destination path.
   // Tested: without the sink (direct path) a phone stutters with the screen off.
-  // KNOWN OPEN ISSUE: the <audio>/MediaStream sink adds latency that
-  // ctx.outputLatency does not report, so the A/V-sync compensation under-covers
-  // on mobile and visuals there lead the sound. Unsolved — see CLAUDE.md.
+  // The sink can add latency that ctx.outputLatency does not report, which would
+  // make visuals lead the sound on mobile. No lead was seen in the last phone
+  // test; if one shows on another device, look here first — see CLAUDE.md.
   let sink = null;
   const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
   if (touch) {

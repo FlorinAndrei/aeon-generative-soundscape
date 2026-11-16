@@ -29,7 +29,10 @@ const PALETTE = {
   ripple: { hueShift: 40, sat: 85, light: 70 },     // mote/pad ripples
 };
 
-export function createCanvas(canvas, system, voices, analyser, events, clock) {
+// `rng` is a seeded generator of the canvas's own (ripple placement): seeded so a
+// link reproduces the visuals too, separate so drawing never shifts the audio's
+// random stream.
+export function createCanvas(canvas, system, voices, analyser, events, clock, rng) {
   const ctx = canvas.getContext('2d');
   const freqData = new Uint8Array(analyser.frequencyBinCount);
 
@@ -72,7 +75,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
     if (type === 'mote') {
       ripples.push({
         x: 0.5 + data.pan * 0.4,
-        y: 0.2 + Math.random() * 0.6,
+        y: 0.2 + rng.next() * 0.6,
         r: 0,
         max: 0.12 + (data.strength || 0.5) * 0.1,
         life: 1,
@@ -80,7 +83,7 @@ export function createCanvas(canvas, system, voices, analyser, events, clock) {
       });
     } else if (type === 'pad') {
       ripples.push({
-        x: 0.5 + (Math.random() - 0.5) * 0.3,
+        x: 0.5 + (rng.next() - 0.5) * 0.3,
         y: 0.5,
         r: 0,
         max: 0.5,

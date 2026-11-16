@@ -91,7 +91,10 @@ while still letting nudges through.
 (`engine/rng.js`, mulberry32). The seed lives in the URL hash, so a link
 reproduces the whole evolution. Never call `Math.random()` in audio/system logic
 — thread `rng` through instead. (`Math.random()` is only acceptable in one-off UI
-glue like generating a fresh seed token.)
+glue like generating a fresh seed token.) Two side consumers get their **own**
+generator derived from the seed (`makeRng(seedToken + ':visuals')` for ripple
+placement, `':reverb'` for the convolver fallback), so they are reproducible
+without shifting the main stream that drives the music.
 
 **Music theory** (`engine/theory.js`): scales/modes, MIDI→freq, scale-constrained
 note/chord selection so output is always consonant; the root drifts by
@@ -138,9 +141,10 @@ keeps the audio running there. Desktop has no such problem, so the `(pointer:
 coarse)` gate keeps the clean direct path. The context is created with
 `latencyHint` set to **2× the platform's `'playback'` buffer** (probed at startup)
 — latency is irrelevant here, and the large buffer is headroom against
-underrun-crackle on CPU spikes. **Open issue:** the `<audio>`/MediaStream sink
-adds latency `ctx.outputLatency` does not report, so the A/V-sync compensation
-(see Visuals) under-covers on mobile and visuals there lead the sound.
+underrun-crackle on CPU spikes. The `<audio>`/MediaStream sink can add latency
+that `ctx.outputLatency` does not report, which would make the A/V-sync
+compensation (see Visuals) fall short on mobile — but no lead was seen in the
+last phone test (see *Mobile playback & performance*).
 
 Sends and effects:
 - `reverb.js` + `reverb-worklet.js` — a feedback delay network (8 delay lines, a
@@ -173,9 +177,10 @@ it when `audibleTime()` reaches its scheduled `time`; the orb level bumps
 (`motes`/`pad`) defer the same way; the analyser haze is drawn from a short ring
 buffer of past spectra, picking the snapshot from `audibleTime()` ago. No hardcoded
 latency — the offset is entirely device-derived. This is exact on the **direct**
-speaker path (desktop), but on **mobile** the `<audio>`/MediaStream sink adds
-latency `ctx.outputLatency` doesn't include, so the offset under-covers and
-visuals still lead the sound there — unsolved. (Note: no build step means the
+speaker path (desktop). On **mobile** the `<audio>`/MediaStream sink can add
+latency `ctx.outputLatency` doesn't include; an earlier note recorded visuals
+leading the sound there, but in the November 2026 phone test sound and visuals
+looked in sync. (Note: no build step means the
 browser caches these ES modules; **always serve with caching off** — a stale
 cached module silently runs old code and looked, in one session, like a fix that
 "didn't work.")
@@ -219,9 +224,12 @@ that was wrong — the stutter was real.
   `adb reverse` and `localhost`).
 - **Polyphony is capped** (motes 14 voices, pad 24 oscillators); excess onsets are
   dropped, inaudibly sparse.
-- **Open issue: on mobile, visuals lead the sound.** The A/V-sync compensation
-  reads `ctx.outputLatency`, but the `<audio>`/MediaStream sink adds latency that
-  value doesn't include (it's exact on the desktop direct path). Unsolved.
+- **A/V sync looked right on the phone.** An earlier note recorded visuals leading
+  the sound on mobile (the `<audio>`/MediaStream sink can add latency that
+  `ctx.outputLatency` doesn't include). In this test, sound and visuals looked in
+  sync on the phone and on desktop, judged by eye, with no change made to the
+  sync code. If a lead shows again on another device, that sink latency is the
+  first suspect.
 - **Out of our control:** the brief glitch when another app's notification sound
   steals audio focus (Android ducking).
 
